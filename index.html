@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Pengurusan & Imbasan DO Gudang</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <!-- SheetJS for Excel Exporting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .card-kpi { border: none; border-radius: 12px; transition: transform 0.2s; }
+    .card-kpi:hover { transform: translateY(-3px); }
+    .scan-station { background: #ffffff; border-left: 5px solid #0d6efd; border-radius: 12px; }
+    .badge-status { font-size: 0.85rem; padding: 6px 12px; border-radius: 20px; }
+    .table-container { background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .nav-pills .nav-link.active { background-color: #0d6efd; font-weight: 600; }
+    .scan-feedback { font-size: 1.1rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm">
+  <a class="navbar-brand fw-bold" href="#">
+    <i class="fa-solid fa-boxes-packing text-primary me-2"></i>Sistem DO Gudang
+  </a>
+  <div class="navbar-nav ms-auto">
+    <button class="btn btn-primary me-2 active" id="btnNavMain" onclick="switchPage('MAIN')">
+      <i class="fa-solid fa-chart-line me-1"></i> Operations & Dashboard
+    </button>
+    <button class="btn btn-outline-light position-relative" id="btnNavBlueCopy" onclick="switchPage('BLUE_COPY')">
+      <i class="fa-solid fa-file-signature text-info me-1"></i> Konfirmasi Salinan Biru DO
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="badgePendingBlue">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- PAGE 1: UTAMA / DASHBOARD & OPERATIONS -->
+<div id="pageMain" class="container-fluid py-4 px-4">
+  <!-- KPI Summary Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card card-kpi bg-white shadow-sm p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <p class="text-muted small mb-1">Jumlah Keseluruhan DO</p>
+            <h3 class="fw-bold mb-0 text-dark" id="kpiTotal">0</h3>
+          </div>
+          <div class="bg-light p-3 rounded-circle text-primary"><i class="fa-solid fa-list-check fa-lg"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card card-kpi bg-white shadow-sm p-3 border-bottom border-warning border-4">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <p class="text-muted small mb-1">Status: Processing</p>
+            <h3 class="fw-bold mb-0 text-warning" id="kpiProcessing">0</h3>
+          </div>
+          <div class="bg-warning-subtle p-3 rounded-circle text-warning"><i class="fa-solid fa-spinner fa-lg"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card card-kpi bg-white shadow-sm p-3 border-bottom border-info border-4">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <p class="text-muted small mb-1">Status: Order Ready</p>
+            <h3 class="fw-bold mb-0 text-info" id="kpiReady">0</h3>
+          </div>
+          <div class="bg-info-subtle p-3 rounded-circle text-info"><i class="fa-solid fa-box-open fa-lg"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card card-kpi bg-white shadow-sm p-3 border-bottom border-success border-4">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <p class="text-muted small mb-1">Handover to Transporter</p>
+            <h3 class="fw-bold mb-0 text-success" id="kpiHandover">0</h3>
+          </div>
+          <div class="bg-success-subtle p-3 rounded-circle text-success"><i class="fa-solid fa-truck-fast fa-lg"></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Column: Operations -->
+    <div class="col-lg-4">
+      
+      <!-- 1. Copy & Paste DO Registration -->
+      <div class="card shadow-sm border-0 mb-4 rounded-3">
+        <div class="card-body">
+          <h5 class="fw-bold mb-2"><i class="fa-solid fa-paste me-2 text-primary"></i>1. Pendaftaran Pukal DO</h5>
+          <p class="text-muted small mb-2">Tampal senarai kod DO di bawah (satu kod setiap baris/koma):</p>
+          
+          <div class="mb-2">
+            <textarea id="pasteDoInput" class="form-control font-monospace" rows="4" placeholder="Contoh:&#10;DO-9001&#10;DO-9002"></textarea>
+          </div>
+          
+          <div class="mb-3">
+            <input type="text" id="clientNameInput" class="form-control form-control-sm" placeholder="Nama Klien (Pilihan)">
+          </div>
+
+          <button class="btn btn-primary w-100 fw-semibold" onclick="registerPastedDOs()">
+            <i class="fa-solid fa-plus-circle me-1"></i> Daftar Senarai DO
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Barcode Scanner Station -->
+      <div class="card scan-station shadow-sm p-3">
+        <h5 class="fw-bold mb-3"><i class="fa-solid fa-barcode me-2 text-primary"></i>2. Stesen Imbasan Kod Bar</h5>
+        
+        <div class="mb-3">
+          <label class="form-label fw-semibold small text-muted">Pilih Mod Imbasan:</label>
+          <select id="scanMode" class="form-select fw-bold border-primary">
+            <option value="COUNT_READY">1. Imbas Kotak (+1 Kuantiti Imbasan)</option>
+            <option value="HANDOVER">2. Imbas Single DO Transporter (Order Ready ➔ Handover)</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold small text-muted">Imbas Kod Bar Kotak / DO:</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fa-solid fa-qrcode text-primary"></i></span>
+            <input type="text" id="barcodeInput" class="form-control form-control-lg fw-bold" placeholder="Imbas di sini..." autofocus onkeypress="processBarcodeScan(event)">
+          </div>
+          <small class="text-muted">Tekan <i>Enter</i> selepas imbasan kod bar.</small>
+        </div>
+
+        <!-- Scan Feedback Output -->
+        <div id="scanAlert" class="mt-2"></div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Top Management Segregated View -->
+    <div class="col-lg-8">
+      <div class="table-container p-4">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <ul class="nav nav-pills" id="doTabs">
+            <li class="nav-item">
+              <button class="nav-link active" onclick="filterTable('ALL')">Semua DO</button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" onclick="filterTable('Processing')">Processing</button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" onclick="filterTable('Order Ready')">Order Ready</button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" onclick="filterTable('Handover to Transporter')">Handover</button>
+            </li>
+          </ul>
+
+          <input type="text" id="searchDO" class="form-control form-control-sm w-25" placeholder="Cari DO / Klien..." onkeyup="renderData()">
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>No. DO</th>
+                <th>Nama Klien</th>
+                <th class="text-center">Jumlah Kotak Muktamad</th>
+                <th class="text-center">Imbasan Semasa</th>
+                <th>Status DO</th>
+                <th>Tindakan</th>
+              </tr>
+            </thead>
+            <tbody id="doTableBody">
+              <!-- Data rows rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 2: KONFIRMASI SALINAN BIRU DO (ADMIN FILE RECORD) -->
+<div id="pageBlueCopy" class="container-fluid py-4 px-4 d-none">
+  <div class="card table-container p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+      <div>
+        <h3 class="fw-bold text-dark mb-0"><i class="fa-solid fa-file-signature text-info me-2"></i>Konfirmasi Salinan Biru DO</h3>
+        <p class="text-muted small mb-0">Senarai DO berstatus <strong>Handover to Transporter</strong> untuk rekod fail fizikal admin.</p>
+      </div>
+      <button class="btn btn-outline-success btn-sm" onclick="exportToExcel()">
+        <i class="fa-solid fa-file-excel me-1"></i> Eksport Laporan Excel
+      </button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>No. DO</th>
+            <th>Nama Klien</th>
+            <th class="text-center">Jumlah Kotak</th>
+            <th>Status DO</th>
+            <th>Rekod Salinan Biru (Admin File)</th>
+            <th class="text-center">Tindakan Pengesahan</th>
+          </tr>
+        </thead>
+        <tbody id="blueCopyTableBody">
+          <!-- Data rows rendered dynamically -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript Engine -->
+<script>
+  // SILA TAMPAL WEB APP URL DARIPADA GOOGLE APPS SCRIPT ANDA DI SINI
+  const GOOGLE_SCRIPT_URL = "TAMPAL
